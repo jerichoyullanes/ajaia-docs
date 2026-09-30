@@ -14,6 +14,9 @@ Route::prefix('{current_team}')
     });
 
 Route::middleware(['auth'])->group(function () {
+    Route::resource('documents', DocumentController::class)
+        ->only(['store', 'show', 'update', 'destroy']);
+
     Route::post('invitations/{invitation}/accept', [TeamInvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('invitations/{invitation}', [TeamInvitationController::class, 'decline'])->name('invitations.decline');
 });

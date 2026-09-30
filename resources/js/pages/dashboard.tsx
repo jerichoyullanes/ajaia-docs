@@ -1,8 +1,15 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import PendingInvitationsModal from '@/components/pending-invitations-modal';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    destroy,
+    show,
+    store,
+} from '@/actions/App/Http/Controllers/DocumentController';
 import { dashboard } from '@/routes';
 import type { DashboardInvitation } from '@/types';
 
@@ -50,13 +57,18 @@ export default function Dashboard({
 
             <div className="flex flex-1 flex-col gap-8 p-4">
                 <section className="space-y-4" aria-labelledby="owned-heading">
-                    <div>
+                    <div className="flex items-center justify-between gap-4">
                         <h2
                             id="owned-heading"
                             className="text-lg font-semibold"
                         >
                             My Documents
                         </h2>
+                        <Button asChild>
+                            <Link href={store()} method="post" as="button">
+                                <Plus /> New document
+                            </Link>
+                        </Button>
                     </div>
 
                     {owned.length > 0 ? (
@@ -68,10 +80,37 @@ export default function Dashboard({
                                     className="gap-3 py-4"
                                 >
                                     <CardContent className="flex items-center justify-between gap-3">
-                                        <p className="truncate font-medium">
-                                            {document.title}
-                                        </p>
-                                        <Badge variant="secondary">Owner</Badge>
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            <Link
+                                                href={show(document.id)}
+                                                className="truncate font-medium hover:underline"
+                                            >
+                                                {document.title}
+                                            </Link>
+                                            <Badge variant="secondary">
+                                                Owner
+                                            </Badge>
+                                        </div>
+                                        {document.can.delete ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={`Delete ${document.title}`}
+                                                onClick={() =>
+                                                    router.delete(
+                                                        destroy.url(
+                                                            document.id,
+                                                        ),
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                <Trash2 />
+                                            </Button>
+                                        ) : null}
                                     </CardContent>
                                 </Card>
                             ))}
@@ -105,9 +144,12 @@ export default function Dashboard({
                                 >
                                     <CardContent className="flex items-center justify-between gap-3">
                                         <div className="min-w-0">
-                                            <p className="truncate font-medium">
+                                            <Link
+                                                href={show(document.id)}
+                                                className="block truncate font-medium hover:underline"
+                                            >
                                                 {document.title}
-                                            </p>
+                                            </Link>
                                             <p className="truncate text-sm text-muted-foreground">
                                                 Shared by {document.ownerName}
                                             </p>
