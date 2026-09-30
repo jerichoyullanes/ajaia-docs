@@ -50,6 +50,7 @@ export default defineConfig({
             'resources/js/components/ui/*',
             'resources/js/routes/**',
             'resources/js/wayfinder/**',
+            'IMPLEMENTATION-PLAN.md',
         ],
         options: {
             denyWarnings: true,
