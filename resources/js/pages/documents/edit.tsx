@@ -1,5 +1,10 @@
-import { Head, useForm } from '@inertiajs/react';
-import type { FormEvent } from 'react';
+import type { Editor, JSONContent } from '@tiptap/core';
+import { Head, router } from '@inertiajs/react';
+import { useCallback, useEffect, useState } from 'react';
+import RichEditor from '@/components/documents/rich-editor';
+import SaveStatus, {
+    type SaveStatusValue,
+} from '@/components/documents/save-status';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,23 +15,10 @@ import {
 } from '@/actions/App/Http/Controllers/DocumentController';
 import { dashboard } from '@/routes';
 
-type JsonValue =
-    | string
-    | number
-    | boolean
-    | null
-    | JsonValue[]
-    | { [key: string]: JsonValue };
-
-type DocumentContent = {
-    type: 'doc';
-    content: JsonValue[];
-};
-
 type Document = {
     id: number;
     title: string;
-    content: DocumentContent;
+    content: JSONContent;
 };
 
 type Props = {
@@ -39,49 +31,102 @@ type Props = {
 };
 
 export default function DocumentsEdit({ document, can }: Props) {
-    const form = useForm({ title: document.title });
+    const [title, setTitle] = useState(document.title);
+    const [editor, setEditor] = useState<Editor | null>(null);
+    const [saveStatus, setSaveStatus] = useState<SaveStatusValue>('Saved');
 
-    function submit(event: FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        form.transform((data) => ({
-            ...data,
-            content: document.content,
-        }));
-        form.put(update.url(document.id), { preserveScroll: true });
-    }
+    const saveDocument = useCallback(() => {
+        if (!can.update || !editor) {
+            return;
+        }
+
+        router.put(
+            update.url(document.id),
+            {
+                title,
+                content: editor.getJSON(),
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setSaveStatus('Saving…'),
+                onSuccess: () => setSaveStatus('Saved'),
+                onError: () => setSaveStatus('Error'),
+                onHttpException: () => setSaveStatus('Error'),
+                onNetworkError: () => setSaveStatus('Error'),
+            },
+        );
+    }, [can.update, document.id, editor, title]);
+
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent) {
+            if (
+                (event.metaKey || event.ctrlKey) &&
+                event.key.toLowerCase() === 's'
+            ) {
+                event.preventDefault();
+                saveDocument();
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [saveDocument]);
 
     return (
         <>
             <Head title={document.title} />
 
             <div className="flex flex-1 flex-col gap-6 p-4">
-                <h1 className="text-xl font-semibold">{document.title}</h1>
+                <h1 className="sr-only">{document.title}</h1>
 
-                <form onSubmit={submit} className="max-w-xl space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="title">Title</Label>
                         <Input
                             id="title"
                             name="title"
-                            value={form.data.title}
-                            onChange={(event) =>
-                                form.setData('title', event.currentTarget.value)
-                            }
+                            value={title}
+                            onChange={(event) => {
+                                setTitle(event.currentTarget.value);
+                                setSaveStatus('Unsaved changes');
+                            }}
                             readOnly={!can.update}
                             required
                             maxLength={255}
-                            aria-invalid={Boolean(form.errors.title)}
+                            aria-invalid={saveStatus === 'Error'}
                         />
-                        <InputError message={form.errors.title} />
+                        <InputError
+                            message={
+                                saveStatus === 'Error'
+                                    ? 'Unable to save the document.'
+                                    : undefined
+                            }
+                        />
                     </div>
 
-                    <Button
-                        type="submit"
-                        disabled={!can.update || form.processing}
-                    >
-                        {form.processing ? 'Saving…' : 'Save'}
-                    </Button>
-                </form>
+                    <div className="flex items-center gap-4">
+                        <SaveStatus status={saveStatus} />
+                        <Button
+                            type="button"
+                            disabled={
+                                !can.update ||
+                                !editor ||
+                                saveStatus === 'Saving…'
+                            }
+                            onClick={saveDocument}
+                        >
+                            Save
+                        </Button>
+                    </div>
+                </div>
+
+                <RichEditor
+                    content={document.content}
+                    editable={can.update}
+                    onChange={() => setSaveStatus('Unsaved changes')}
+                    onEditorReady={setEditor}
+                />
             </div>
         </>
     );

@@ -141,3 +141,57 @@
         @apply bg-background text-foreground;
     }
 }
+
+.tiptap {
+    min-height: 20rem;
+    outline: none;
+}
+
+.tiptap > * + * {
+    margin-top: 0.75em;
+}
+
+.tiptap p {
+    margin: 0.75em 0;
+}
+
+.tiptap h1,
+.tiptap h2,
+.tiptap h3 {
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 1.25em 0 0.5em;
+}
+
+.tiptap h1 {
+    font-size: 1.875rem;
+}
+
+.tiptap h2 {
+    font-size: 1.5rem;
+}
+
+.tiptap h3 {
+    font-size: 1.25rem;
+}
+
+.tiptap ul,
+.tiptap ol {
+    padding-left: 1.5rem;
+}
+
+.tiptap ul {
+    list-style-type: disc;
+}
+
+.tiptap ol {
+    list-style-type: decimal;
+}
+
+.tiptap li p {
+    margin: 0.25em 0;
+}
+
+.tiptap:focus {
+    outline: none;
+}
