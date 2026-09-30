@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ImportDocumentRequest;
 use App\Http\Requests\UpdateDocumentRequest;
 use App\Models\Document;
 use App\Models\TeamInvitation;
+use App\Services\TiptapImporter;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use LogicException;
 
 class DocumentController extends Controller
 {
@@ -107,6 +112,43 @@ class DocumentController extends Controller
                 ],
             ],
         ]);
+
+        return to_route('documents.show', $document);
+    }
+
+    /**
+     * Import a plain text or Markdown file as a document.
+     */
+    public function importDocument(ImportDocumentRequest $request, TiptapImporter $importer): RedirectResponse
+    {
+        $this->authorize('create', Document::class);
+
+        $file = $request->file('file');
+
+        if (! $file instanceof UploadedFile) {
+            throw new LogicException('The validated document import request must contain a file.');
+        }
+
+        $text = $file->getContent();
+
+        if (! mb_check_encoding($text, 'UTF-8')) {
+            throw ValidationException::withMessages([
+                'file' => __('The uploaded file must contain valid UTF-8 text.'),
+            ]);
+        }
+
+        if (trim($text) === '') {
+            throw ValidationException::withMessages([
+                'file' => __('The uploaded file must not be empty.'),
+            ]);
+        }
+
+        $document = $request->user()->documents()->create([
+            'title' => $file->getClientOriginalName(),
+            'content' => $importer->fromText($text, $file->getClientOriginalExtension()),
+        ]);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Document imported.')]);
 
         return to_route('documents.show', $document);
     }

@@ -15,6 +15,7 @@ Route::prefix('{current_team}')
     });
 
 Route::middleware(['auth'])->group(function () {
+    Route::post('documents/import', [DocumentController::class, 'importDocument'])->name('documents.import');
     Route::resource('documents', DocumentController::class)
         ->only(['store', 'show', 'update', 'destroy']);
     Route::post('documents/{document}/shares', [DocumentShareController::class, 'store'])->name('documents.shares.store');

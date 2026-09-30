@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import ImportDocumentDialog from '@/components/documents/import-document-dialog';
 import PendingInvitationsModal from '@/components/pending-invitations-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -64,11 +65,14 @@ export default function Dashboard({
                         >
                             My Documents
                         </h2>
-                        <Button asChild>
-                            <Link href={store()} method="post" as="button">
-                                <Plus /> New document
-                            </Link>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <ImportDocumentDialog />
+                            <Button asChild>
+                                <Link href={store()} method="post" as="button">
+                                    <Plus /> New document
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
 
                     {owned.length > 0 ? (

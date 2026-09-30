@@ -1,7 +1,167 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
+
+test('owners can import a text file as a document', function () {
+    $owner = User::factory()->create();
+
+    $response = $this->actingAs($owner)->post(route('documents.import'), [
+        'file' => UploadedFile::fake()->createWithContent(
+            'meeting-notes.txt',
+            "First paragraph\ncontinued.\n\nSecond paragraph.",
+        ),
+    ]);
+
+    $document = $owner->documents()->firstOrFail();
+
+    $response->assertRedirect(route('documents.show', $document));
+    $response->assertInertiaFlash('toast.message', 'Document imported.');
+    expect($document->title)->toBe('meeting-notes.txt');
+    expect($document->content)->toBe([
+        'type' => 'doc',
+        'content' => [
+            [
+                'type' => 'paragraph',
+                'content' => [
+                    ['type' => 'text', 'text' => "First paragraph\ncontinued."],
+                ],
+            ],
+            [
+                'type' => 'paragraph',
+                'content' => [
+                    ['type' => 'text', 'text' => 'Second paragraph.'],
+                ],
+            ],
+        ],
+    ]);
+});
+
+test('owners can import markdown headings paragraphs and lists without inline formatting', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)->post(route('documents.import'), [
+        'file' => UploadedFile::fake()->createWithContent(
+            'guide.md',
+            "# Guide\n\nParagraph with **literal** text.\n\n- first\n- second\n\n1. ordered one\n2. ordered two\n\n### Details",
+        ),
+    ])->assertRedirect(route('documents.show', $owner->documents()->firstOrFail()));
+
+    expect($owner->documents()->firstOrFail()->content)->toBe([
+        'type' => 'doc',
+        'content' => [
+            [
+                'type' => 'heading',
+                'attrs' => ['level' => 1],
+                'content' => [['type' => 'text', 'text' => 'Guide']],
+            ],
+            [
+                'type' => 'paragraph',
+                'content' => [['type' => 'text', 'text' => 'Paragraph with **literal** text.']],
+            ],
+            [
+                'type' => 'bulletList',
+                'content' => [
+                    ['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'first']]]]],
+                    ['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'second']]]]],
+                ],
+            ],
+            [
+                'type' => 'orderedList',
+                'attrs' => ['start' => 1],
+                'content' => [
+                    ['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'ordered one']]]]],
+                    ['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'ordered two']]]]],
+                ],
+            ],
+            [
+                'type' => 'heading',
+                'attrs' => ['level' => 3],
+                'content' => [['type' => 'text', 'text' => 'Details']],
+            ],
+        ],
+    ]);
+});
+
+test('document import rejects a missing file', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'))
+        ->assertSessionHasErrors('file');
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects unsupported file extensions', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()->createWithContent('report.pdf', 'not a supported document'),
+        ])
+        ->assertSessionHasErrors('file');
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects files larger than one megabyte', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()->create('large.txt', 1025, 'text/plain'),
+        ])
+        ->assertSessionHasErrors('file');
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects filenames too long for the document title', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()->createWithContent(
+                str_repeat('a', 252).'.txt',
+                'valid text',
+            ),
+        ])
+        ->assertSessionHasErrors([
+            'file' => 'The filename may not exceed 255 characters.',
+        ]);
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects non UTF-8 text without creating a document', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()->createWithContent('invalid.txt', "\xFF"),
+        ])
+        ->assertSessionHasErrors([
+            'file' => 'The uploaded file must contain valid UTF-8 text.',
+        ]);
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects empty files without creating a document', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()->createWithContent('empty.txt', " \r\n\t"),
+        ])
+        ->assertSessionHasErrors([
+            'file' => 'The uploaded file must not be empty.',
+        ]);
+
+    expect($owner->documents()->count())->toBe(0);
+});
 
 test('guests are redirected when opening a document', function () {
     $owner = User::factory()->create();
