@@ -2,18 +2,16 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Teams\CreateTeam;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
-    public function run(): void
+    public function run(CreateTeam $createTeam): void
     {
         $owner = User::updateOrCreate(
             ['email' => 'owner@example.com'],
@@ -31,6 +29,9 @@ class DatabaseSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
+
+        $this->ensurePersonalTeam($owner, $createTeam);
+        $this->ensurePersonalTeam($reviewer, $createTeam);
 
         $welcomeDocument = $owner->documents()->updateOrCreate(
             ['title' => 'Welcome to the Editor'],
@@ -121,5 +122,22 @@ class DatabaseSeeder extends Seeder
         $reviewerDocument->sharedWith()->syncWithoutDetaching([
             $owner->getKey() => ['permission' => 'view'],
         ]);
+    }
+
+    private function ensurePersonalTeam(User $user, CreateTeam $createTeam): void
+    {
+        $personalTeam = $user->personalTeam();
+
+        if ($personalTeam === null) {
+            $personalTeam = $createTeam->handle(
+                $user,
+                $user->name."'s Team",
+                isPersonal: true,
+            );
+        }
+
+        if (! $user->isCurrentTeam($personalTeam)) {
+            $user->switchTeam($personalTeam);
+        }
     }
 }

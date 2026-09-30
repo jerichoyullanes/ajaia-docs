@@ -25,6 +25,34 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
+test('seeded demo users can log in and visit their dashboard after repeated seeding', function () {
+    $this->seed();
+    $this->seed();
+
+    $this->assertDatabaseCount('teams', 2);
+    $this->assertDatabaseCount('team_members', 2);
+
+    foreach (['owner@example.com', 'reviewer@example.com'] as $email) {
+        $user = User::where('email', $email)->firstOrFail();
+        $personalTeam = $user->personalTeam();
+
+        expect($personalTeam)->not->toBeNull();
+        expect($user->current_team_id)->toBe($personalTeam->id);
+
+        $dashboardUrl = route('dashboard', ['current_team' => $personalTeam->slug]);
+
+        $this->post(route('login.store'), [
+            'email' => $email,
+            'password' => 'password',
+        ])
+            ->assertRedirect($dashboardUrl);
+
+        $this->assertAuthenticatedAs($user);
+        $this->get($dashboardUrl)->assertOk();
+        $this->post(route('logout'));
+    }
+});
+
 test('dashboard includes pending invitations for the authenticated user', function () {
     $owner = User::factory()->create(['name' => 'Taylor Otwell']);
     $invitedUser = User::factory()->create(['email' => 'invited@example.com']);

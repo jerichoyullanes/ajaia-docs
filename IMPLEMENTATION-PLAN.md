@@ -81,6 +81,7 @@ Use the starter kit auth as-is. Seeder is idempotent (`updateOrCreate`/`firstOrC
 
 - `owner@example.com` / `password`, `email_verified_at` set
 - `reviewer@example.com` / `password`, `email_verified_at` set
+- Both demo users have an idempotently created personal team selected as their current team, so the team-scoped login redirect and dashboard can resolve.
 - Owner's "Welcome to the Editor": valid Tiptap JSON using heading, bold, italic, underline, bullet and ordered lists; shared to reviewer with `edit`
 - Owner's "Private Notes": not shared (proves 403)
 - Reviewer's "Reviewer Notes": shared to owner with `view`
