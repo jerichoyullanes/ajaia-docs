@@ -1,6 +1,7 @@
 import { Form } from '@inertiajs/react';
-import { Upload } from 'lucide-react';
+import { LoaderCircle, Upload } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,17 @@ export default function ImportDocumentDialog() {
                     key={String(open)}
                     {...importDocument.form()}
                     className="space-y-6"
+                    onError={(errors) =>
+                        toast.error(
+                            errors.file ?? 'Unable to import the document.',
+                        )
+                    }
+                    onHttpException={() => {
+                        toast.error('Unable to import the document.');
+                    }}
+                    onNetworkError={() => {
+                        toast.error('Unable to import the document.');
+                    }}
                 >
                     {({ errors, processing }) => (
                         <>
@@ -62,7 +74,14 @@ export default function ImportDocumentDialog() {
                                     </Button>
                                 </DialogClose>
                                 <Button type="submit" disabled={processing}>
-                                    {processing ? 'Importing…' : 'Import'}
+                                    {processing ? (
+                                        <>
+                                            <LoaderCircle className="animate-spin" />
+                                            Importing…
+                                        </>
+                                    ) : (
+                                        'Import'
+                                    )}
                                 </Button>
                             </DialogFooter>
                         </>

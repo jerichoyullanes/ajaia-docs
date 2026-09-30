@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { LoaderCircle, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useState } from 'react';
 import ImportDocumentDialog from '@/components/documents/import-document-dialog';
 import PendingInvitationsModal from '@/components/pending-invitations-modal';
@@ -46,6 +47,10 @@ export default function Dashboard({
     const [showInvitations, setShowInvitations] = useState(
         pendingInvitations.length > 0,
     );
+    const [creatingDocument, setCreatingDocument] = useState(false);
+    const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(
+        null,
+    );
 
     return (
         <>
@@ -68,8 +73,23 @@ export default function Dashboard({
                         <div className="flex items-center gap-2">
                             <ImportDocumentDialog />
                             <Button asChild>
-                                <Link href={store()} method="post" as="button">
-                                    <Plus /> New document
+                                <Link
+                                    href={store()}
+                                    method="post"
+                                    as="button"
+                                    onStart={() => setCreatingDocument(true)}
+                                    onFinish={() => setCreatingDocument(false)}
+                                >
+                                    {creatingDocument ? (
+                                        <>
+                                            <LoaderCircle className="animate-spin" />
+                                            Creating…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus /> New document
+                                        </>
+                                    )}
                                 </Link>
                             </Button>
                         </div>
@@ -101,6 +121,10 @@ export default function Dashboard({
                                                 variant="ghost"
                                                 size="icon"
                                                 aria-label={`Delete ${document.title}`}
+                                                disabled={
+                                                    deletingDocumentId ===
+                                                    document.id
+                                                }
                                                 onClick={() =>
                                                     router.delete(
                                                         destroy.url(
@@ -108,11 +132,40 @@ export default function Dashboard({
                                                         ),
                                                         {
                                                             preserveScroll: true,
+                                                            onStart: () =>
+                                                                setDeletingDocumentId(
+                                                                    document.id,
+                                                                ),
+                                                            onError: () =>
+                                                                toast.error(
+                                                                    'Unable to delete the document.',
+                                                                ),
+                                                            onHttpException:
+                                                                () => {
+                                                                    toast.error(
+                                                                        'Unable to delete the document.',
+                                                                    );
+                                                                },
+                                                            onNetworkError:
+                                                                () => {
+                                                                    toast.error(
+                                                                        'Unable to delete the document.',
+                                                                    );
+                                                                },
+                                                            onFinish: () =>
+                                                                setDeletingDocumentId(
+                                                                    null,
+                                                                ),
                                                         },
                                                     )
                                                 }
                                             >
-                                                <Trash2 />
+                                                {deletingDocumentId ===
+                                                document.id ? (
+                                                    <LoaderCircle className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 />
+                                                )}
                                             </Button>
                                         ) : null}
                                     </CardContent>

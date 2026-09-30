@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Document;
+use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -49,8 +50,40 @@ class StoreShareRequest extends FormRequest
                     && Str::lower($email) === Str::lower($document->owner->email)
                 ) {
                     $validator->errors()->add('email', __('You cannot share a document with its owner.'));
+
+                    return;
+                }
+
+                if ($validator->errors()->has('email') || ! is_string($email)) {
+                    return;
+                }
+
+                $user = User::query()
+                    ->where('email', $email)
+                    ->first();
+
+                if (
+                    $document instanceof Document
+                    && $user !== null
+                    && $document->sharedWith()->whereKey($user->getKey())->exists()
+                ) {
+                    $validator->errors()->add('email', __('This document is already shared with this user.'));
                 }
             },
+        ];
+    }
+
+    /**
+     * Get custom validation messages for sharing.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.required' => __('Enter the email address of the person to share with.'),
+            'email.email' => __('Enter a valid email address.'),
+            'email.exists' => __('No user was found with this email address.'),
         ];
     }
 }

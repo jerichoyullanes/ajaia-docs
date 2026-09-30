@@ -101,7 +101,25 @@ test('document import rejects unsupported file extensions', function () {
         ->post(route('documents.import'), [
             'file' => UploadedFile::fake()->createWithContent('report.pdf', 'not a supported document'),
         ])
-        ->assertSessionHasErrors('file');
+        ->assertSessionHasErrors([
+            'file' => 'Choose a file with a .txt or .md extension.',
+        ]);
+
+    expect($owner->documents()->count())->toBe(0);
+});
+
+test('document import rejects files whose content is not text', function () {
+    $owner = User::factory()->create();
+
+    $this->actingAs($owner)
+        ->post(route('documents.import'), [
+            'file' => UploadedFile::fake()
+                ->createWithContent('report.txt', 'not text content')
+                ->mimeType('application/pdf'),
+        ])
+        ->assertSessionHasErrors([
+            'file' => 'The file contents must be plain text or Markdown.',
+        ]);
 
     expect($owner->documents()->count())->toBe(0);
 });
@@ -113,7 +131,9 @@ test('document import rejects files larger than one megabyte', function () {
         ->post(route('documents.import'), [
             'file' => UploadedFile::fake()->create('large.txt', 1025, 'text/plain'),
         ])
-        ->assertSessionHasErrors('file');
+        ->assertSessionHasErrors([
+            'file' => 'The file may not be larger than 1 MB.',
+        ]);
 
     expect($owner->documents()->count())->toBe(0);
 });
@@ -314,7 +334,7 @@ test('strangers cannot view, update, or delete a document', function () {
     expect($document->refresh()->title)->toBe('Private document');
 });
 
-test('owners can share with users and update existing permissions', function () {
+test('owners can share with users and see the share in the editor', function () {
     $owner = User::factory()->create();
     $collaborator = User::factory()->create();
     $document = $owner->documents()->create([
@@ -333,20 +353,22 @@ test('owners can share with users and update existing permissions', function () 
     $this->post(route('documents.shares.store', $document), [
         'email' => $collaborator->email,
         'permission' => 'edit',
-    ])->assertRedirect();
+    ])->assertSessionHasErrors([
+        'email' => 'This document is already shared with this user.',
+    ]);
 
     $this->assertDatabaseCount('document_shares', 1);
     $this->assertDatabaseHas('document_shares', [
         'document_id' => $document->id,
         'user_id' => $collaborator->id,
-        'permission' => 'edit',
+        'permission' => 'view',
     ]);
 
     $this->get(route('documents.show', $document))
         ->assertInertia(fn (Assert $page) => $page
             ->has('shares', 1)
             ->where('shares.0.id', $collaborator->id)
-            ->where('shares.0.permission', 'edit'),
+            ->where('shares.0.permission', 'view'),
         );
 });
 
@@ -422,7 +444,9 @@ test('owners can only share with existing users using a valid permission', funct
             'email' => 'missing@example.com',
             'permission' => 'edit',
         ])
-        ->assertSessionHasErrors('email');
+        ->assertSessionHasErrors([
+            'email' => 'No user was found with this email address.',
+        ]);
 
     $this->post(route('documents.shares.store', $document), [
         'email' => $collaborator->email,

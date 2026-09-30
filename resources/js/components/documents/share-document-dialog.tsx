@@ -1,6 +1,7 @@
 import { Form, router } from '@inertiajs/react';
-import { Share2, Trash2 } from 'lucide-react';
+import { LoaderCircle, Share2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ type Props = {
 export default function ShareDocumentDialog({ documentId, shares }: Props) {
     const [open, setOpen] = useState(false);
     const [permission, setPermission] = useState<'view' | 'edit'>('edit');
+    const [removingShareId, setRemovingShareId] = useState<number | null>(null);
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -58,6 +60,19 @@ export default function ShareDocumentDialog({ documentId, shares }: Props) {
                     {...store.form(documentId)}
                     className="space-y-6"
                     resetOnSuccess
+                    onError={(errors) =>
+                        toast.error(
+                            errors.email ??
+                                errors.permission ??
+                                'Unable to share the document.',
+                        )
+                    }
+                    onHttpException={() => {
+                        toast.error('Unable to share the document.');
+                    }}
+                    onNetworkError={() => {
+                        toast.error('Unable to share the document.');
+                    }}
                 >
                     {({ errors, processing }) => (
                         <>
@@ -155,17 +170,48 @@ export default function ShareDocumentDialog({ documentId, shares }: Props) {
                                             variant="ghost"
                                             size="icon"
                                             aria-label={`Remove access for ${share.email}`}
+                                            disabled={
+                                                removingShareId === share.id
+                                            }
                                             onClick={() =>
                                                 router.delete(
                                                     destroy.url([
                                                         documentId,
                                                         share.id,
                                                     ]),
-                                                    { preserveScroll: true },
+                                                    {
+                                                        preserveScroll: true,
+                                                        onStart: () =>
+                                                            setRemovingShareId(
+                                                                share.id,
+                                                            ),
+                                                        onError: () =>
+                                                            toast.error(
+                                                                'Unable to remove access.',
+                                                            ),
+                                                        onHttpException: () => {
+                                                            toast.error(
+                                                                'Unable to remove access.',
+                                                            );
+                                                        },
+                                                        onNetworkError: () => {
+                                                            toast.error(
+                                                                'Unable to remove access.',
+                                                            );
+                                                        },
+                                                        onFinish: () =>
+                                                            setRemovingShareId(
+                                                                null,
+                                                            ),
+                                                    },
                                                 )
                                             }
                                         >
-                                            <Trash2 />
+                                            {removingShareId === share.id ? (
+                                                <LoaderCircle className="animate-spin" />
+                                            ) : (
+                                                <Trash2 />
+                                            )}
                                         </Button>
                                     </div>
                                 </li>

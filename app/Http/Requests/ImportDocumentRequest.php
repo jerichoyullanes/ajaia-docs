@@ -26,7 +26,22 @@ class ImportDocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => ['required', 'file', 'max:1024', 'extensions:txt,md'],
+            'file' => ['required', 'file', 'max:1024', 'extensions:txt,md', 'mimes:txt,md'],
+        ];
+    }
+
+    /**
+     * Get custom validation messages for document imports.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'file.required' => __('Choose a TXT or Markdown file to import.'),
+            'file.max' => __('The file may not be larger than 1 MB.'),
+            'file.extensions' => __('Choose a file with a .txt or .md extension.'),
+            'file.mimes' => __('The file contents must be plain text or Markdown.'),
         ];
     }
 

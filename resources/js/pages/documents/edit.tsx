@@ -1,6 +1,7 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 import { Head, router } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import RichEditor from '@/components/documents/rich-editor';
 import ShareDocumentDialog from '@/components/documents/share-document-dialog';
 import SaveStatus, {
@@ -42,6 +43,7 @@ export default function DocumentsEdit({ document, shares, can }: Props) {
     const [title, setTitle] = useState(document.title);
     const [editor, setEditor] = useState<Editor | null>(null);
     const [saveStatus, setSaveStatus] = useState<SaveStatusValue>('Saved');
+    const [titleError, setTitleError] = useState<string | undefined>();
 
     const saveDocument = useCallback(() => {
         if (!can.update || !editor) {
@@ -56,11 +58,31 @@ export default function DocumentsEdit({ document, shares, can }: Props) {
             },
             {
                 preserveScroll: true,
-                onStart: () => setSaveStatus('Saving…'),
-                onSuccess: () => setSaveStatus('Saved'),
-                onError: () => setSaveStatus('Error'),
-                onHttpException: () => setSaveStatus('Error'),
-                onNetworkError: () => setSaveStatus('Error'),
+                onStart: () => {
+                    setTitleError(undefined);
+                    setSaveStatus('Saving…');
+                },
+                onSuccess: () => {
+                    setTitleError(undefined);
+                    setSaveStatus('Saved');
+                },
+                onError: (errors) => {
+                    setTitleError(errors.title);
+                    setSaveStatus('Error');
+                    toast.error(
+                        errors.title ??
+                            errors.content ??
+                            'Unable to save the document.',
+                    );
+                },
+                onHttpException: () => {
+                    setSaveStatus('Error');
+                    toast.error('Unable to save the document.');
+                },
+                onNetworkError: () => {
+                    setSaveStatus('Error');
+                    toast.error('Unable to save the document.');
+                },
             },
         );
     }, [can.update, document.id, editor, title]);
@@ -97,20 +119,18 @@ export default function DocumentsEdit({ document, shares, can }: Props) {
                             value={title}
                             onChange={(event) => {
                                 setTitle(event.currentTarget.value);
+                                setTitleError(undefined);
                                 setSaveStatus('Unsaved changes');
                             }}
                             readOnly={!can.update}
                             required
                             maxLength={255}
-                            aria-invalid={saveStatus === 'Error'}
-                        />
-                        <InputError
-                            message={
+                            aria-invalid={
+                                titleError !== undefined ||
                                 saveStatus === 'Error'
-                                    ? 'Unable to save the document.'
-                                    : undefined
                             }
                         />
+                        <InputError message={titleError} />
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -133,7 +153,7 @@ export default function DocumentsEdit({ document, shares, can }: Props) {
                             }
                             onClick={saveDocument}
                         >
-                            Save
+                            {saveStatus === 'Saving…' ? 'Saving…' : 'Save'}
                         </Button>
                     </div>
                 </div>
