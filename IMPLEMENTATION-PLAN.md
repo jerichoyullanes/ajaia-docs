@@ -27,16 +27,16 @@ Lightweight Google Docs-style editor. Priorities, in order: working end-to-end, 
 
 ## 3. Architecture
 
-| Layer | Responsibility |
-|---|---|
-| Laravel | Routing, FormRequest validation, Policy authorization, Eloquent persistence, TXT/MD to Tiptap JSON conversion, flash messages |
-| Inertia/React | Pages, forms, toolbar, editor state, save state. Uses Inertia `router`/`useForm`, no client-side API calls |
-| Database | Users, documents, shares. FKs and a unique share row |
-| Tiptap | Editing and formatting. Emits JSON, receives JSON |
-| Auth | Starter kit auth. Two seeded users, registration left on |
-| Authorization | One `DocumentPolicy`, called with `$this->authorize()`. `can` flags passed to React |
-| Import | Multipart POST to `TiptapImporter` to new `Document` to redirect to editor |
-| Deploy | GitHub to Laravel Cloud app to Cloud Serverless Postgres (or external Postgres via env vars) |
+| Layer         | Responsibility                                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Laravel       | Routing, FormRequest validation, Policy authorization, Eloquent persistence, TXT/MD to Tiptap JSON conversion, flash messages |
+| Inertia/React | Pages, forms, toolbar, editor state, save state. Uses Inertia `router`/`useForm`, no client-side API calls                    |
+| Database      | Users, documents, shares. FKs and a unique share row                                                                          |
+| Tiptap        | Editing and formatting. Emits JSON, receives JSON                                                                             |
+| Auth          | Starter kit auth. Two seeded users, registration left on                                                                      |
+| Authorization | One `DocumentPolicy`, called with `$this->authorize()`. `can` flags passed to React                                           |
+| Import        | Multipart POST to `TiptapImporter` to new `Document` to redirect to editor                                                    |
+| Deploy        | GitHub to Laravel Cloud app to Cloud Serverless Postgres (or external Postgres via env vars)                                  |
 
 ## 4. Scope
 
@@ -49,6 +49,7 @@ Lightweight Google Docs-style editor. Priorities, in order: working end-to-end, 
 ## 5. Database
 
 **documents**
+
 - `id` bigint PK
 - `owner_id` foreignId to users, cascadeOnDelete
 - `title` string(255), default `'Untitled document'`
@@ -57,6 +58,7 @@ Lightweight Google Docs-style editor. Priorities, in order: working end-to-end, 
 - index `(owner_id, updated_at)`
 
 **document_shares**
+
 - `id` bigint PK
 - `document_id` foreignId to documents, cascadeOnDelete
 - `user_id` foreignId to users, cascadeOnDelete
@@ -65,6 +67,7 @@ Lightweight Google Docs-style editor. Priorities, in order: working end-to-end, 
 - unique `(document_id, user_id)`; index `user_id`
 
 **Relationships**
+
 - `Document::owner()` belongsTo User (`owner_id`)
 - `Document::sharedWith()` belongsToMany User via `document_shares`, `withPivot('permission')`
 - `User::documents()` hasMany Document (`owner_id`)
@@ -84,12 +87,12 @@ Use the starter kit auth as-is. Seeder is idempotent (`updateOrCreate`/`firstOrC
 
 ## 7. Authorization (DocumentPolicy)
 
-| Action | Owner | Shared `edit` | Shared `view` | Other |
-|---|---|---|---|---|
-| view | yes | yes | yes | no |
-| update (content and rename) | yes | yes | no | no |
-| share / unshare | yes | no | no | no |
-| delete | yes | no | no | no |
+| Action                      | Owner | Shared `edit` | Shared `view` | Other |
+| --------------------------- | ----- | ------------- | ------------- | ----- |
+| view                        | yes   | yes           | yes           | no    |
+| update (content and rename) | yes   | yes           | no            | no    |
+| share / unshare             | yes   | no            | no            | no    |
+| delete                      | yes   | no            | no            | no    |
 
 Every document controller action calls `$this->authorize(...)`. Pass `can` flags (`update`, `share`, `delete`) to React. The server is the enforcement; the UI only hides actions.
 
@@ -124,8 +127,8 @@ All under the `auth` middleware group. Define `documents/import` before the reso
 1. Dashboard "Import file" button opens a dialog with a file input (`useForm`, `forceFormData`).
 2. `POST /documents/import` validates `file` as `required|file|max:1024|extensions:txt,md` (confirm the rule name in the Laravel docs).
 3. Controller reads contents, rejects non-UTF-8, normalizes line endings, calls `TiptapImporter::fromText($text, $ext)`.
-   - TXT: blank-line-separated paragraphs.
-   - MD: `#`/`##`/`###` headings; `-`/`*` lines as a bulletList; `1.` lines as an orderedList; everything else paragraphs. No inline Markdown parsing.
+    - TXT: blank-line-separated paragraphs.
+    - MD: `#`/`##`/`###` headings; `-`/`*` lines as a bulletList; `1.` lines as an orderedList; everything else paragraphs. No inline Markdown parsing.
 4. Create a Document owned by the user, titled with the filename minus extension, redirect to its editor with a success flash. The uploaded file is not stored.
 
 ## 11. UX
@@ -164,57 +167,69 @@ README.md  ARCHITECTURE.md  AI-WORKFLOW.md  SUBMISSION.md
 Each phase lists objective, work, verification and definition of done. An agent asked to "do Phase N" does only Phase N.
 
 ### Phase 1: Setup and first deploy
+
 - **Work:** scaffold with `laravel new ajaia-docs --using=laravel/react-starter-kit` (Pest, SQLite, Laravel auth); `npm i @tiptap/react @tiptap/pm @tiptap/starter-kit`; push to GitHub; create Cloud app and deploy the bare kit.
 - **Verify:** `composer run dev` works locally; live URL shows login page.
 - **Done:** app runs locally and on the live URL.
 
 ### Phase 2: Schema, models, policy, seeder
+
 - **Work:** two migrations; `Document` model with `array` cast and relations; `User` relations; `DocumentPolicy`; idempotent seeder per section 6.
 - **Verify:** `php artisan migrate:fresh --seed`; tinker shows relations and seeded data.
 - **Done:** seeded data present, relations work.
 
 ### Phase 3: Dashboard
+
 - **Work:** `DocumentController@index` returns `owned` and `shared` (with owner name, pivot permission, `can` flags), ordered by `updated_at` desc. Dashboard page with two sections, badges, empty states.
 - **Verify:** log in as both users.
 - **Done:** both sections render correctly for each user.
 
 ### Phase 4: Document CRUD
+
 - **Work:** routes per section 8; `store` creates blank doc and redirects; `update` validates `title` (`required|string|max:255`) and `content` (`required|array`) via `UpdateDocumentRequest`; `destroy`; authorize everywhere; "New document" and owner-only delete on dashboard; edit page with title input and Save button.
 - **Verify:** owner creates, renames, deletes; another user's private doc returns 403.
 - **Done:** CRUD works and authorization is enforced.
 
 ### Phase 5: Tiptap editor
+
 - **Work:** `rich-editor`, `editor-toolbar`, `save-status`, `edit.tsx`, `.tiptap` CSS per section 9.
 - **Verify:** apply all six formats, Save, hard refresh, content identical.
 - **Done:** all formats persist across refresh.
 
 ### Phase 6: Sharing
+
 - **Work:** `DocumentShareController`; `StoreShareRequest` (email `required|email|exists:users,email`, not the owner, permission in `view,edit`; `updateOrCreate`); owner-only authorize; share dialog; view-only editor mode; 403 page.
 - **Verify:** share, log in as other user, confirm view vs edit behavior.
 - **Done:** sharing and permissions work end to end.
 
 ### Phase 7: Import
+
 - **Work:** `TiptapImporter`, import route and request, dialog per section 10.
 - **Verify:** import a sample `.txt` and `.md`; try a `.pdf`.
 - **Done:** valid files open as editable docs; invalid files show a validation error.
 
 ### Phase 8: Validation and errors
+
 - **Work:** inline errors for title, share email (unknown, self, duplicate), import (type, size, empty); toasts on save, share, import, delete; loading states. No new features.
 - **Done:** every failure path shows a clear message.
 
 ### Phase 9: Automated test
+
 - **Work:** `tests/Feature/DocumentAccessTest.php` as a single Pest test with `RefreshDatabase` and factories. Actors: owner, shared-edit user, shared-view user, stranger. Assert: owner GET 200; stranger GET 403 and PUT 403; view-user GET 200 and PUT 403; edit-user PUT 200 with content persisted; edit-user DELETE 403; owner DELETE succeeds.
 - **Verify:** `php artisan test`.
 - **Done:** test passes.
 
 ### Phase 10: Polish and production readiness
+
 - **Work:** spacing, editor column, empty states, responsive toolbar wrap. Check `.env.example`, `.gitignore` (`.env`, `node_modules`, `vendor`, `database.sqlite`), `npm run build`, Postgres-safe migrations.
 - **Done:** build passes, no secrets tracked.
 
 ### Phase 11: Documentation
+
 - **Work:** `README.md` (features, local setup, demo accounts, test command, live URL), `ARCHITECTURE.md` (layers, data model, authorization table, storage format, import flow, trade-offs, what was cut), `AI-WORKFLOW.md` (Claude plans/reviews, Codex implements in small prompts, Copilot inline; what was verified by hand; one concrete example where AI output was corrected), `SUBMISSION.md` (live URL, credentials, video link, checklist). Be factual to the actual code.
 
 ### Phase 12: Deployment review
+
 - Read-only checklist: migrate and seed on deploy, `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, Postgres env vars, session/cache drivers work, assets built, no dependence on local SQLite or file storage.
 
 ## 14. Deployment (Laravel Cloud)
@@ -230,26 +245,26 @@ Each phase lists objective, work, verification and definition of done. An agent 
 
 ## 15. Manual test matrix (live URL)
 
-| # | Check | Expected |
-|---|---|---|
-| 1 | Login as owner | Dashboard with both sections |
-| 2 | Create document | Editor opens, title "Untitled document" |
-| 3 | Rename, Save | Saved state; dashboard shows new title |
-| 4 | Bold, italic, underline, H1/H2, bullets, numbers | All render |
-| 5 | Save, hard refresh | Content and formatting identical |
-| 6 | Go back, reopen | Same content |
-| 7 | Import `.txt` | New doc with paragraphs |
-| 8 | Import `.md` | Headings and lists correct |
-| 9 | Import `.pdf` | Validation error, no doc created |
-| 10 | Share with reviewer (edit) | Appears in share list |
-| 11 | Log out, log in as reviewer | "Shared With Me" shows doc with correct badge |
-| 12 | Reviewer edits and saves | Persists; owner sees it |
-| 13 | Reviewer on a view-only doc | Toolbar disabled, no Share button |
-| 14 | Reviewer opens owner's private doc URL | 403 page |
-| 15 | Share with unknown or own email | Inline validation error |
-| 16 | Save with empty title | Validation error |
-| 17 | Log out, open a doc URL | Redirects to login |
-| 18 | Log back in | Data still present |
+| #   | Check                                            | Expected                                      |
+| --- | ------------------------------------------------ | --------------------------------------------- |
+| 1   | Login as owner                                   | Dashboard with both sections                  |
+| 2   | Create document                                  | Editor opens, title "Untitled document"       |
+| 3   | Rename, Save                                     | Saved state; dashboard shows new title        |
+| 4   | Bold, italic, underline, H1/H2, bullets, numbers | All render                                    |
+| 5   | Save, hard refresh                               | Content and formatting identical              |
+| 6   | Go back, reopen                                  | Same content                                  |
+| 7   | Import `.txt`                                    | New doc with paragraphs                       |
+| 8   | Import `.md`                                     | Headings and lists correct                    |
+| 9   | Import `.pdf`                                    | Validation error, no doc created              |
+| 10  | Share with reviewer (edit)                       | Appears in share list                         |
+| 11  | Log out, log in as reviewer                      | "Shared With Me" shows doc with correct badge |
+| 12  | Reviewer edits and saves                         | Persists; owner sees it                       |
+| 13  | Reviewer on a view-only doc                      | Toolbar disabled, no Share button             |
+| 14  | Reviewer opens owner's private doc URL           | 403 page                                      |
+| 15  | Share with unknown or own email                  | Inline validation error                       |
+| 16  | Save with empty title                            | Validation error                              |
+| 17  | Log out, open a doc URL                          | Redirects to login                            |
+| 18  | Log back in                                      | Data still present                            |
 
 ## 16. Known risks and fallbacks
 
