@@ -1,14 +1,27 @@
-# AI Workflow
+# AI-Native Workflow Note
 
-AI assistance was used as a coding partner under user-defined, incremental requirements. The user retained control of scope and requested implementation in focused steps rather than asking the assistant to design additional product features.
+## Tools used
 
-For each implementation task, the workflow was to:
+- **GitHub Copilot (Free Plan) in VS Code** as the AI coding assistant for requirements-driven implementation and review.
+- **VS Code workspace tools** to inspect source files and package versions, edit code, and run checks.
+- **Laravel Boost** for project/runtime context and framework documentation where version-specific behavior mattered.
 
-1. Read the implementation plan and inspect the relevant existing routes, controllers, models, React pages/components, package versions, and tests.
-2. Follow the established Laravel, Inertia, React, and UI patterns; keep changes scoped to the requested behavior and avoid adding dependencies.
-3. Implement the feature across the backend and frontend where required, with server-side validation and authorization treated as authoritative.
-4. Add or update targeted Pest coverage for behavior and important failure paths.
-5. Run relevant checks, including tests, PHP static analysis/formatting, frontend checks, TypeScript, and the production build. Use browser verification when checking user-visible behavior is useful.
-6. Report changed files, verification results, and any remaining limitations.
+## Where AI materially helped
 
-The completed work includes document creation, editing, sharing, TXT/Markdown import, validation feedback, and access-control behavior. AI-generated changes should still be reviewed by the submitter, especially before deployment or use with non-demo data. AI assistance does not imply that the application has been deployed or that external production configuration has been verified.
+AI was most useful for connecting the end-to-end slices across Laravel routes, Form Requests, policies, Eloquent models, Inertia pages, and React components while keeping the existing starter-kit conventions. It also helped produce focused regression coverage for sharing permissions, upload validation, and document access, and made rapid feedback-driven iterations practical within the assessment time.
+
+## Output reviewed and changed
+
+AI suggestions were treated as drafts, not accepted blindly. For example:
+
+- The existing share endpoint could update an existing share's permission. For the requested duplicate-share validation UX, that behavior was changed to return an inline validation error for an already-shared user instead.
+- Import validation was strengthened to check both the supplied extension and the detected file type; extension alone does not establish the file's content type.
+- TypeScript caught that concise Inertia error callbacks returned Sonner's toast identifier instead of `void`. Those callbacks were rewritten with block bodies, and the type check was rerun.
+
+The implementation was kept within the requested feature set; suggestions that would expand scope (such as autosave or realtime collaboration) were not pursued.
+
+## Verification approach
+
+Correctness was checked with Pest feature tests, including owner/editor/viewer/stranger access, share validation, and import failure cases. PHPStan, Pint, frontend lint/format checks, TypeScript, the production build, and `git diff --check` were also run. Browser smoke checks exercised demo-owner login, the dashboard/editor, title validation, duplicate-share feedback, and save/share loading feedback.
+
+The checks above verify the local implementation, not a production deployment. Reviewers should still inspect the code and repeat the acceptance flow against the deployed environment once a live URL is available.
