@@ -2,9 +2,11 @@ import type { Editor, JSONContent } from '@tiptap/core';
 import { Head, router } from '@inertiajs/react';
 import { useCallback, useEffect, useState } from 'react';
 import RichEditor from '@/components/documents/rich-editor';
+import ShareDocumentDialog from '@/components/documents/share-document-dialog';
 import SaveStatus, {
     type SaveStatusValue,
 } from '@/components/documents/save-status';
+import { Badge } from '@/components/ui/badge';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +25,12 @@ type Document = {
 
 type Props = {
     document: Document;
+    shares: {
+        id: number;
+        name: string;
+        email: string;
+        permission: 'view' | 'edit';
+    }[];
     can: {
         update: boolean;
         share: boolean;
@@ -30,7 +38,7 @@ type Props = {
     };
 };
 
-export default function DocumentsEdit({ document, can }: Props) {
+export default function DocumentsEdit({ document, shares, can }: Props) {
     const [title, setTitle] = useState(document.title);
     const [editor, setEditor] = useState<Editor | null>(null);
     const [saveStatus, setSaveStatus] = useState<SaveStatusValue>('Saved');
@@ -106,6 +114,15 @@ export default function DocumentsEdit({ document, can }: Props) {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {!can.update ? (
+                            <Badge variant="secondary">View only</Badge>
+                        ) : null}
+                        {can.share ? (
+                            <ShareDocumentDialog
+                                documentId={document.id}
+                                shares={shares}
+                            />
+                        ) : null}
                         <SaveStatus status={saveStatus} />
                         <Button
                             type="button"

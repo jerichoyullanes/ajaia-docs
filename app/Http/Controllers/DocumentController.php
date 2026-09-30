@@ -118,6 +118,8 @@ class DocumentController extends Controller
     {
         $this->authorize('view', $document);
 
+        $canShare = $request->user()->can('share', $document);
+
         return Inertia::render('documents/edit', [
             'document' => [
                 'id' => $document->id,
@@ -131,9 +133,25 @@ class DocumentController extends Controller
             ],
             'can' => [
                 'update' => $request->user()->can('update', $document),
-                'share' => $request->user()->can('share', $document),
+                'share' => $canShare,
                 'delete' => $request->user()->can('delete', $document),
             ],
+            'shares' => $canShare
+                ? $document->sharedWith()
+                    ->orderBy('name')
+                    ->get(['users.id', 'users.name', 'users.email'])
+                    ->map(function ($user) {
+                        /** @var Pivot $pivot */
+                        $pivot = $user->getRelation('pivot');
+
+                        return [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'email' => $user->email,
+                            'permission' => $pivot->getAttribute('permission'),
+                        ];
+                    })
+                : [],
         ]);
     }
 

@@ -140,7 +140,10 @@ test('strangers cannot view, update, or delete a document', function () {
 
     $this->actingAs($stranger)
         ->get(route('documents.show', $document))
-        ->assertForbidden();
+        ->assertForbidden()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('errors/403'),
+        );
 
     $this->put(route('documents.update', $document), [
         'title' => 'Unauthorized edit',
@@ -149,6 +152,146 @@ test('strangers cannot view, update, or delete a document', function () {
 
     $this->delete(route('documents.destroy', $document))->assertForbidden();
     expect($document->refresh()->title)->toBe('Private document');
+});
+
+test('owners can share with users and update existing permissions', function () {
+    $owner = User::factory()->create();
+    $collaborator = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Shared document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('documents.shares.store', $document), [
+            'email' => $collaborator->email,
+            'permission' => 'view',
+        ])
+        ->assertRedirect()
+        ->assertInertiaFlash('toast.message', 'Document shared.');
+
+    $this->post(route('documents.shares.store', $document), [
+        'email' => $collaborator->email,
+        'permission' => 'edit',
+    ])->assertRedirect();
+
+    $this->assertDatabaseCount('document_shares', 1);
+    $this->assertDatabaseHas('document_shares', [
+        'document_id' => $document->id,
+        'user_id' => $collaborator->id,
+        'permission' => 'edit',
+    ]);
+
+    $this->get(route('documents.show', $document))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('shares', 1)
+            ->where('shares.0.id', $collaborator->id)
+            ->where('shares.0.permission', 'edit'),
+        );
+});
+
+test('owners can remove a collaborator share', function () {
+    $owner = User::factory()->create();
+    $collaborator = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Shared document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+    $document->sharedWith()->attach($collaborator, ['permission' => 'view']);
+
+    $this->actingAs($owner)
+        ->delete(route('documents.shares.destroy', [$document, $collaborator]))
+        ->assertRedirect()
+        ->assertInertiaFlash('toast.message', 'Document unshared.');
+
+    $this->assertDatabaseCount('document_shares', 0);
+});
+
+test('shared collaborators cannot manage document shares', function () {
+    $owner = User::factory()->create();
+    $editor = User::factory()->create();
+    $invitee = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Shared document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+    $document->sharedWith()->attach($editor, ['permission' => 'edit']);
+
+    $this->actingAs($editor)
+        ->post(route('documents.shares.store', $document), [
+            'email' => $invitee->email,
+            'permission' => 'view',
+        ])
+        ->assertForbidden();
+
+    $this->delete(route('documents.shares.destroy', [$document, $editor]))
+        ->assertForbidden();
+
+    $this->assertDatabaseCount('document_shares', 1);
+});
+
+test('owners cannot share documents with themselves', function () {
+    $owner = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Private document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('documents.shares.store', $document), [
+            'email' => mb_strtoupper($owner->email),
+            'permission' => 'edit',
+        ])
+        ->assertSessionHasErrors([
+            'email' => 'You cannot share a document with its owner.',
+        ]);
+
+    $this->assertDatabaseCount('document_shares', 0);
+});
+
+test('owners can only share with existing users using a valid permission', function () {
+    $owner = User::factory()->create();
+    $collaborator = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Private document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+
+    $this->actingAs($owner)
+        ->post(route('documents.shares.store', $document), [
+            'email' => 'missing@example.com',
+            'permission' => 'edit',
+        ])
+        ->assertSessionHasErrors('email');
+
+    $this->post(route('documents.shares.store', $document), [
+        'email' => $collaborator->email,
+        'permission' => 'admin',
+    ])->assertSessionHasErrors('permission');
+
+    $this->assertDatabaseCount('document_shares', 0);
+});
+
+test('view collaborators cannot see share management information', function () {
+    $owner = User::factory()->create();
+    $viewer = User::factory()->create();
+    $collaborator = User::factory()->create();
+    $document = $owner->documents()->create([
+        'title' => 'Shared document',
+        'content' => ['type' => 'doc', 'content' => [['type' => 'paragraph']]],
+    ]);
+    $document->sharedWith()->attach([
+        $viewer->id => ['permission' => 'view'],
+        $collaborator->id => ['permission' => 'edit'],
+    ]);
+
+    $this->actingAs($viewer)
+        ->get(route('documents.show', $document))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('shares', 0)
+            ->where('can.share', false)
+            ->where('can.update', false),
+        );
 });
 
 test('document updates reject missing and invalid fields', function (array $payload, array $errors) {
