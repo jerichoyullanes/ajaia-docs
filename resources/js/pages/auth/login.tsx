@@ -124,6 +124,24 @@ export default function Login({
                 )}
             </Form>
 
+            <div className="mt-6 rounded-lg border bg-muted/40 p-4 text-sm">
+                <p className="mb-3 font-medium">Demo accounts</p>
+                <div className="grid gap-3 text-muted-foreground">
+                    <p>
+                        <span className="font-medium text-foreground">
+                            Owner:
+                        </span>{' '}
+                        owner@example.com / password
+                    </p>
+                    <p>
+                        <span className="font-medium text-foreground">
+                            Reviewer:
+                        </span>{' '}
+                        reviewer@example.com / password
+                    </p>
+                </div>
+            </div>
+
             {status && (
                 <div className="mb-4 text-center text-sm font-medium text-green-600">
                     {status}
